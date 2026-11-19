@@ -5,6 +5,9 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-2022
@@ -17,11 +20,14 @@ jobs:
         with:
           python-version: "3.8.10"
 
+      - name: Validate Python syntax
+        run: python -m compileall -q app
+
       - name: Install PyInstaller
         run: python -m pip install --upgrade pip && python -m pip install pyinstaller==5.13.2
 
       - name: Build application
-        run: python -m PyInstaller --noconfirm --clean --windowed --name RecoveryHDD --paths app app\main.py
+        run: python -m PyInstaller --noconfirm --clean --windowed --name RecoveryHDD --paths app app\\main.py
 
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
@@ -29,7 +35,7 @@ jobs:
       - name: Build installer
         shell: pwsh
         run: |
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\RecoveryHDD.iss
+          & "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe" installer\\RecoveryHDD.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload installer artifact
@@ -38,3 +44,12 @@ jobs:
           name: RecoveryHDD-Setup
           path: Output/RecoveryHDD_Setup.exe
           if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.${{ github.run_number }}
+          name: Recovery HDD v0.1.${{ github.run_number }}
+          generate_release_notes: true
+          files: Output/RecoveryHDD_Setup.exe
