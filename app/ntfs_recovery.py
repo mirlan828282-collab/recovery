@@ -314,7 +314,7 @@ def scan_deleted_files(disk_number, volume, progress=None):
 
 
 def recover_file(disk_number, volume, item, destination):
-    """Извлекает один найденный файл в указанный каталог назначения."""
+    """Потоково извлекает один файл в каталог на другом физическом диске."""
     if item.get("directory"):
         raise ValueError("Каталог как отдельный файл не восстанавливается.")
     os.makedirs(destination, exist_ok=True)
@@ -324,24 +324,51 @@ def recover_file(disk_number, volume, item, destination):
     if not parts:
         parts = ["recovered_%d.bin" % item["record"]]
     target = os.path.join(destination, *parts)
-    parent = os.path.dirname(target)
-    os.makedirs(parent, exist_ok=True)
-    h = _open(disk_number)
-    try:
-        d = item["data"]
-        payload = d["resident"] if d["resident"] is not None else _read_stream(h, d["runs"], d["size"])
-    finally:
-        k32.CloseHandle(h)
-    if len(payload) != item["size"]:
-        raise IOError("Файл прочитан не полностью; сохранение отменено.")
-    # Avoid overwriting files with identical names.
+    os.makedirs(os.path.dirname(target), exist_ok=True)
     base, ext = os.path.splitext(target)
     candidate, n = target, 1
     while os.path.exists(candidate):
         candidate = "%s_recovered_%d%s" % (base, n, ext)
         n += 1
-    with open(candidate, "wb") as f:
-        f.write(payload)
+
+    d = item["data"]
+    written = 0
+    h = _open(disk_number)
+    try:
+        with open(candidate, "wb") as output:
+            if d["resident"] is not None:
+                payload = d["resident"]
+                output.write(payload)
+                written = len(payload)
+            else:
+                for physical, run_length in d["runs"] or []:
+                    remaining = min(run_length, item["size"] - written)
+                    while remaining > 0:
+                        take = min(remaining, CHUNK)
+                        if physical is None:
+                            chunk = b"\x00" * take
+                        else:
+                            chunk = _read(h, physical + (run_length - remaining), take)
+                            if len(chunk) != take:
+                                raise IOError("Исходный диск вернул неполный блок данных.")
+                        output.write(chunk)
+                        written += len(chunk)
+                        remaining -= len(chunk)
+                    if written >= item["size"]:
+                        break
+            output.flush()
+        if written != item["size"]:
+            raise IOError("Файл прочитан не полностью (%d из %d байт)." %
+                          (written, item["size"]))
+    except Exception:
+        try:
+            if os.path.exists(candidate):
+                os.remove(candidate)
+        except OSError:
+            pass
+        raise
+    finally:
+        k32.CloseHandle(h)
     return candidate
 
 
