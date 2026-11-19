@@ -32,7 +32,7 @@ class NtfsParserTests(unittest.TestCase):
     def test_decode_sparse_data_run(self):
         runs = ntfs_recovery._parse_runs(bytes([0x01, 2, 0]), 4096)
         self.assertEqual(runs, [(None, 2 * 4096)])
-        self.assertEqual(ntfs_recovery._read_run_slice(None, runs, 0, 8), b"\\x00" * 8)
+        self.assertEqual(ntfs_recovery._read_run_slice(None, runs, 0, 8), b"\x00" * 8)
 
 
 if __name__ == "__main__":
