@@ -223,19 +223,20 @@ def scan_deleted_files(disk_number, volume, progress=None):
             if not rec:
                 continue
             flags = struct.unpack_from("<H", rec, 22)[0]
-            if flags & 1:
-                continue
             names, data = _attributes(rec, volume["cluster"])
             if not names:
                 continue
             parent, name = names[0]
-            if name in (".", "..") or not data or data["size"] > 2 * 1024 * 1024 * 1024:
+            if name in (".", ".."):
                 continue
             item = {"record": i, "parent": parent, "name": name,
-                    "size": data["size"], "data": data,
-                    "directory": bool(flags & 2)}
+                    "size": data["size"] if data else 0, "data": data,
+                    "directory": bool(flags & 2), "in_use": bool(flags & 1)}
+            # Keep live directory records too: they are needed to rebuild paths.
             records[i] = item
-            entries.append(item)
+            if (not item["in_use"] and not item["directory"] and data and
+                    data["size"] <= 2 * 1024 * 1024 * 1024):
+                entries.append(item)
             if progress and i % 128 == 0:
                 progress(min(99, int(i * 100 / max_records)))
         # Resolve old parent references where corresponding MFT records survived.
