@@ -217,7 +217,7 @@ def _read_run_slice(h, runs, logical_offset, size):
         if end > start:
             take = end - start
             if physical is None:
-                out.extend(b"\\x00" * take)
+                out.extend(b"\x00" * take)
             else:
                 out.extend(_read(h, physical + (start - logical_pos), take))
             if len(out) >= size:
