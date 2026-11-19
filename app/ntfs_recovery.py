@@ -282,3 +282,42 @@ def recover_file(disk_number, volume, item, destination):
     with open(candidate, "wb") as f:
         f.write(payload)
     return candidate
+
+
+def destination_disk_numbers(folder):
+    """Определяет физические номера дисков, на которых расположен путь Windows."""
+    drive, _ = os.path.splitdrive(os.path.abspath(folder))
+    if not drive:
+        raise ValueError("Не удалось определить локальный диск папки назначения.")
+    path = r"\\.\%s" % drive
+    h = k32.CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                        None, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, None)
+    if h == INVALID_HANDLE_VALUE or not h:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        # VOLUME_DISK_EXTENTS: DWORD count + first DISK_EXTENT (DWORD + 2 * LARGE_INTEGER).
+        class EXTENT(ctypes.Structure):
+            _fields_ = [("DiskNumber", wintypes.DWORD),
+                        ("StartingOffset", ctypes.c_longlong),
+                        ("ExtentLength", ctypes.c_longlong)]
+        buf = ctypes.create_string_buffer(8 + ctypes.sizeof(EXTENT) * 32)
+        returned = wintypes.DWORD()
+        ok = k32.DeviceIoControl(h, 0x00560000, None, 0, buf, len(buf),
+                                 ctypes.byref(returned), None)
+        if not ok:
+            raise ctypes.WinError(ctypes.get_last_error())
+        count = struct.unpack_from("<I", buf.raw, 0)[0]
+        if count < 1 or count > 32:
+            raise ValueError("Не удалось определить физический диск назначения.")
+        return set(struct.unpack_from("<I", buf.raw, 8 + i * ctypes.sizeof(EXTENT))[0]
+                   for i in range(count))
+    finally:
+        k32.CloseHandle(h)
+
+
+def ensure_destination_is_other_disk(source_disk_number, folder):
+    disks = destination_disk_numbers(folder)
+    if source_disk_number in disks:
+        raise ValueError("Папка назначения находится на том же физическом диске, "
+                         "с которого выполняется восстановление. Выберите другой диск.")
+    return True
