@@ -95,6 +95,7 @@ def find_ntfs_volumes(disk_number, progress=None):
         offset = 0
         overlap = b""
         seen = set()
+        last_progress = -1
         while offset < total_bytes:
             block = _read(h, offset, min(CHUNK, total_bytes - offset))
             data = overlap + block
@@ -126,7 +127,10 @@ def find_ntfs_volumes(disk_number, progress=None):
             offset += len(block)
             overlap = data[-32:]
             if progress:
-                progress(min(100, int(offset * 100 / max(1, total_bytes))))
+                percent = min(100, int(offset * 100 / max(1, total_bytes)))
+                if percent != last_progress:
+                    last_progress = percent
+                    progress(percent)
         return found
     finally:
         k32.CloseHandle(h)
