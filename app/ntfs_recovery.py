@@ -110,7 +110,8 @@ def find_ntfs_volumes(disk_number, progress=None):
                     continue
                 sector = _read(h, boot_offset, 512)
                 info = _valid_boot(sector)
-                if info:
+                if info and boot_offset + info["total"] * info["bps"] <= total_bytes:
+                    # Reject backup boot sectors at the end of a volume.
                     seen.add(boot_offset)
                     info["offset"] = boot_offset
                     found.append(info)
