@@ -110,11 +110,19 @@ def find_ntfs_volumes(disk_number, progress=None):
                     continue
                 sector = _read(h, boot_offset, 512)
                 info = _valid_boot(sector)
-                if info and boot_offset + info["total"] * info["bps"] <= total_bytes:
-                    # Reject backup boot sectors at the end of a volume.
-                    seen.add(boot_offset)
-                    info["offset"] = boot_offset
-                    found.append(info)
+                if info:
+                    # Primary boot sector: its declared volume fits after this offset.
+                    if boot_offset + info["total"] * info["bps"] <= total_bytes:
+                        volume_start = boot_offset
+                    else:
+                        # Backup boot sector: derive the volume start from its last-sector location.
+                        volume_start = boot_offset - (info["total"] - 1) * info["bps"]
+                    if (0 <= volume_start < total_bytes and volume_start % 512 == 0
+                            and volume_start not in seen
+                            and volume_start + info["total"] * info["bps"] <= total_bytes):
+                        seen.add(volume_start)
+                        info["offset"] = volume_start
+                        found.append(info)
             offset += len(block)
             overlap = data[-32:]
             if progress:
@@ -271,7 +279,7 @@ def scan_deleted_files(disk_number, volume, progress=None):
                     "directory": bool(flags & 2), "in_use": bool(flags & 1)}
             # Keep live directory records too: they are needed to rebuild paths.
             records[i] = item
-            if (not item["in_use"] and not item["directory"] and data and
+            if (not item["directory"] and data and
                     data["size"] <= 2 * 1024 * 1024 * 1024):
                 entries.append(item)
             if progress and i % 128 == 0:
