@@ -1,0 +1,1 @@
+# The first diagnostic version uses only Python standard library (Tkinter + ctypes).
