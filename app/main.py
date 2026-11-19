@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
 from disk_scan import list_physical_disks
-from ntfs_recovery import find_ntfs_volumes, scan_deleted_files, recover_file
+from ntfs_recovery import (find_ntfs_volumes, scan_deleted_files, recover_file,\n                           ensure_destination_is_other_disk)
 
 
 class RecoveryApp:
@@ -163,7 +163,7 @@ class RecoveryApp:
             return
         index = self.disk_combo.current()
         disk_number = self.disks[index]["number"]
-        if not messagebox.askyesno("Подтверждение восстановления",
+        try:\n            ensure_destination_is_other_disk(disk_number, folder)\n        except Exception as exc:\n            messagebox.showerror("Небезопасное место сохранения", str(exc))\n            return\n        if not messagebox.askyesno("Подтверждение восстановления",
             "Будут восстановлены %d выбранных файлов в:\n%s\n\n"
             "Убедитесь, что эта папка находится на другом физическом диске. Продолжить?" %
             (len(selected), folder)):
