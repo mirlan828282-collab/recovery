@@ -33,7 +33,7 @@ jobs:
         run: python -m pip install --upgrade pip && python -m pip install pyinstaller==5.13.2
 
       - name: Build application
-        run: python -m PyInstaller --noconfirm --clean --windowed --name RecoveryHDD --paths app app\\main.py
+        run: python -m PyInstaller --noconfirm --clean --windowed --name RecoveryHDD --paths app app/main.py
 
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
@@ -41,7 +41,7 @@ jobs:
       - name: Build installer
         shell: pwsh
         run: |
-          & "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe" installer\\RecoveryHDD.iss
+          & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" installer/RecoveryHDD.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload installer artifact
