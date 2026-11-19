@@ -31,7 +31,7 @@ class RecoveryApp:
         outer = ttk.Frame(self.root, padding=14)
         outer.pack(fill="both", expand=True)
         ttk.Label(outer, text="RECOVERY HDD", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(outer, text="Поиск удалённых файлов NTFS • исходный диск только для чтения").pack(
+        ttk.Label(outer, text="Поиск файлов NTFS • исходный диск только для чтения").pack(
             anchor="w", pady=(2, 12))
 
         warning = tk.Label(outer,
@@ -50,7 +50,7 @@ class RecoveryApp:
                                        state="readonly", width=48)
         self.disk_combo.pack(side="left", padx=8)
         ttk.Button(row, text="Обновить", command=self.refresh_disks).pack(side="left")
-        self.scan_button = ttk.Button(row, text="Найти удалённые файлы",
+        self.scan_button = ttk.Button(row, text="Найти файлы для восстановления",
                                        command=self.start_scan)
         self.scan_button.pack(side="left", padx=(8, 0))
 
@@ -144,7 +144,9 @@ class RecoveryApp:
         for item in items:
             size = item["size"]
             size_text = ("%.2f МБ" % (size / 1048576.0)) if size >= 1048576 else ("%d байт" % size)
-            self.results.insert("end", "%s    [%s]" % (item.get("path", item["name"]), size_text))
+            state = "запись MFT активна" if item.get("in_use") else "удалённая запись"
+            self.results.insert("end", "%s    [%s; %s]" %
+                                (item.get("path", item["name"]), size_text, state))
         self.status.set("Найдено NTFS-кандидатов: %d; записей удалённых файлов: %d. "
                         "Это предварительные результаты." % (len(volumes), len(items)))
         if items:
