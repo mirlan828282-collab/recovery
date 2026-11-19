@@ -147,7 +147,7 @@ class RecoveryApp:
             state = "запись MFT активна" if item.get("in_use") else "удалённая запись"
             self.results.insert("end", "%s    [%s; %s]" %
                                 (item.get("path", item["name"]), size_text, state))
-        self.status.set("Найдено NTFS-кандидатов: %d; записей удалённых файлов: %d. "
+        self.status.set("Найдено NTFS-кандидатов: %d; файловых записей для восстановления: %d. "
                         "Это предварительные результаты." % (len(volumes), len(items)))
         if items:
             self.restore_button.configure(state="normal")
