@@ -121,9 +121,13 @@ def find_ntfs_volumes(disk_number, progress=None):
                     if (0 <= volume_start < total_bytes and volume_start % 512 == 0
                             and volume_start not in seen
                             and volume_start + info["total"] * info["bps"] <= total_bytes):
-                        seen.add(volume_start)
-                        info["offset"] = volume_start
-                        found.append(info)
+                        # Verify the computed start by checking the first MFT record.
+                        mft_probe = _read(h, volume_start + info["mft_lcn"] * info["cluster"],
+                                          info["record_size"])
+                        if mft_probe[:4] == b"FILE":
+                            seen.add(volume_start)
+                            info["offset"] = volume_start
+                            found.append(info)
             offset += len(block)
             overlap = data[-32:]
             if progress:
