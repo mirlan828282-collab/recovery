@@ -139,7 +139,7 @@ def _fixup(record, bps):
     return bytes(out)
 
 
-def _parse_runs(raw, cluster_size):
+def _parse_runs(raw, cluster_size, volume_offset=0):
     runs, pos, current_lcn = [], 0, 0
     while pos < len(raw) and raw[pos]:
         head = raw[pos]
@@ -153,13 +153,13 @@ def _parse_runs(raw, cluster_size):
             delta = int.from_bytes(raw[pos:pos + off_bytes], "little", signed=True)
             current_lcn += delta
             pos += off_bytes
-            runs.append((current_lcn * cluster_size, run_len * cluster_size))
+            runs.append((volume_offset + current_lcn * cluster_size, run_len * cluster_size))
         else:
             runs.append((None, run_len * cluster_size))
     return runs
 
 
-def _attributes(rec, cluster_size):
+def _attributes(rec, cluster_size, volume_offset=0):
     first = struct.unpack_from("<H", rec, 20)[0]
     pos, names, data = first, [], None
     while pos + 8 <= len(rec):
@@ -183,7 +183,7 @@ def _attributes(rec, cluster_size):
         elif typ == 0x80 and nonresident and data is None and length >= 64:
             run_off = struct.unpack_from("<H", rec, pos + 32)[0]
             real_size = struct.unpack_from("<Q", rec, pos + 48)[0]
-            runs = _parse_runs(rec[pos + run_off:pos + length], cluster_size)
+            runs = _parse_runs(rec[pos + run_off:pos + length], cluster_size, volume_offset)
             data = {"resident": None, "size": real_size, "runs": runs}
         pos += length
     return names, data
@@ -240,7 +240,7 @@ def scan_deleted_files(disk_number, volume, progress=None):
         mft_runs = None
         mft_size = MFT_LIMIT
         if first_rec:
-            _mft_names, mft_data = _attributes(first_rec, volume["cluster"])
+            _mft_names, mft_data = _attributes(first_rec, volume["cluster"], volume["offset"])
             if mft_data and mft_data["runs"]:
                 mft_runs = mft_data["runs"]
                 mft_size = min(MFT_LIMIT, mft_data["size"])
@@ -259,7 +259,7 @@ def scan_deleted_files(disk_number, volume, progress=None):
             if not rec:
                 continue
             flags = struct.unpack_from("<H", rec, 22)[0]
-            names, data = _attributes(rec, volume["cluster"])
+            names, data = _attributes(rec, volume["cluster"], volume["offset"])
             if not names:
                 continue
             parent, name = names[0]
