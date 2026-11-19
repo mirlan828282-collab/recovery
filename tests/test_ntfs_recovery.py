@@ -28,6 +28,8 @@ class NtfsParserTests(unittest.TestCase):
         # One run: 3 clusters starting at LCN 5, then terminator.
         runs = ntfs_recovery._parse_runs(bytes([0x11, 3, 5, 0]), 4096)
         self.assertEqual(runs, [(5 * 4096, 3 * 4096)])
+        shifted = ntfs_recovery._parse_runs(bytes([0x11, 3, 5, 0]), 4096, 1024 * 1024)
+        self.assertEqual(shifted, [(1024 * 1024 + 5 * 4096, 3 * 4096)])
 
     def test_decode_sparse_data_run(self):
         runs = ntfs_recovery._parse_runs(bytes([0x01, 2, 0]), 4096)
