@@ -181,11 +181,14 @@ def _attributes(rec, cluster_size, volume_offset=0):
     pos, names, data = first, [], None
     while pos + 8 <= len(rec):
         typ, length = struct.unpack_from("<II", rec, pos)
-        if typ == 0xFFFFFFFF or length < 8 or pos + length > len(rec):
+        if typ == 0xFFFFFFFF or length < 16 or pos + length > len(rec):
             break
         nonresident = rec[pos + 8]
         if typ == 0x30 and not nonresident and length >= 24:
             value_len, value_off = struct.unpack_from("<IH", rec, pos + 16)
+            if value_off < 24 or value_off + value_len > length:
+                pos += length
+                continue
             val = rec[pos + value_off:pos + value_off + value_len]
             if len(val) >= 66:
                 parent = struct.unpack_from("<Q", val, 0)[0] & 0x0000FFFFFFFFFFFF
@@ -195,11 +198,17 @@ def _attributes(rec, cluster_size, volume_offset=0):
                     names.append((parent, name))
         elif typ == 0x80 and not nonresident and data is None:
             value_len, value_off = struct.unpack_from("<IH", rec, pos + 16)
+            if value_off < 24 or value_off + value_len > length:
+                pos += length
+                continue
             data = {"resident": rec[pos + value_off:pos + value_off + value_len],
                     "size": value_len, "runs": None}
         elif typ == 0x80 and nonresident and data is None and length >= 64:
             run_off = struct.unpack_from("<H", rec, pos + 32)[0]
             real_size = struct.unpack_from("<Q", rec, pos + 48)[0]
+            if run_off < 64 or run_off >= length:
+                pos += length
+                continue
             runs = _parse_runs(rec[pos + run_off:pos + length], cluster_size, volume_offset)
             data = {"resident": None, "size": real_size, "runs": runs}
         pos += length
@@ -269,8 +278,6 @@ def scan_deleted_files(disk_number, volume, progress=None):
             else:
                 raw = _read(h, mft_start + i * rs, rs)
             if len(raw) != rs or raw[:4] != b"FILE":
-                if i > 32:
-                    break
                 continue
             rec = _fixup(raw, volume["bps"])
             if not rec:
