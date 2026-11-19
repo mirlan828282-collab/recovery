@@ -205,16 +205,52 @@ def _read_stream(h, runs, size):
     return bytes(out[:size])
 
 
+def _read_run_slice(h, runs, logical_offset, size):
+    """Читает фрагмент логического потока по списку NTFS data runs."""
+    out = bytearray()
+    logical_pos = 0
+    wanted_end = logical_offset + size
+    for physical, run_length in runs:
+        run_end = logical_pos + run_length
+        start = max(logical_offset, logical_pos)
+        end = min(wanted_end, run_end)
+        if end > start:
+            take = end - start
+            if physical is None:
+                out.extend(b"\\x00" * take)
+            else:
+                out.extend(_read(h, physical + (start - logical_pos), take))
+            if len(out) >= size:
+                break
+        logical_pos = run_end
+        if logical_pos >= wanted_end:
+            break
+    return bytes(out[:size])
+
+
 def scan_deleted_files(disk_number, volume, progress=None):
     """Читает первые 128 MiB MFT и возвращает найденные удалённые файловые записи."""
     h = _open(disk_number)
     try:
         rs = volume["record_size"]
         mft_start = volume["offset"] + volume["mft_lcn"] * volume["cluster"]
-        max_records = MFT_LIMIT // rs
+        # Record 0 ($MFT) contains the runlist needed to follow a fragmented MFT.
+        first_raw = _read(h, mft_start, rs)
+        first_rec = _fixup(first_raw, volume["bps"])
+        mft_runs = None
+        mft_size = MFT_LIMIT
+        if first_rec:
+            _mft_names, mft_data = _attributes(first_rec, volume["cluster"])
+            if mft_data and mft_data["runs"]:
+                mft_runs = mft_data["runs"]
+                mft_size = min(MFT_LIMIT, mft_data["size"])
+        max_records = max(1, mft_size // rs)
         records, entries = {}, []
         for i in range(max_records):
-            raw = _read(h, mft_start + i * rs, rs)
+            if mft_runs:
+                raw = _read_run_slice(h, mft_runs, i * rs, rs)
+            else:
+                raw = _read(h, mft_start + i * rs, rs)
             if len(raw) != rs or raw[:4] != b"FILE":
                 if i > 32:
                     break
