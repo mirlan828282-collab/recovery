@@ -24,7 +24,7 @@ jobs:
         run: python -m compileall -q app
 
       - name: Smoke-test application imports
-        run: python -c "import sys; sys.path.insert(0, 'app'); import disk_scan, ntfs_recovery, main; print('Импорты модулей прошли успешно')"
+        run: python -c "import sys; sys.path.insert(0, 'app'); import disk_scan, ntfs_recovery, main; print('Module imports passed')"
 
       - name: Run parser unit tests
         run: python -m unittest discover -s tests -v
